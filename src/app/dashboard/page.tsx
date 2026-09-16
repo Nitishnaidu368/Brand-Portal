@@ -12,10 +12,33 @@ import { fileUrl } from "@/lib/formats";
 import { timeAgo } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Portals" };
+export const dynamic = "force-dynamic";
+
+function reportDashboardFailure(stage: string, error: unknown): never {
+  // Keep the production diagnostic useful without exposing credentials or request headers.
+  const message = error instanceof Error ? error.message : String(error);
+  const redacted = ["DATABASE_URL", "SETUP_SECRET", "SUPABASE_SERVICE_ROLE_KEY"].reduce(
+    (value, name) => (process.env[name] ? value.split(process.env[name]!).join(`[${name}]`) : value),
+    message,
+  );
+  console.error("[dashboard] server load failed", { stage, error: redacted.slice(0, 500) });
+  throw error;
+}
 
 export default async function DashboardPage() {
-  const admin = await requireAdmin();
-  const [portals, recent] = await Promise.all([listPortals(admin.agencyId), getRecentDownloads(admin.agencyId)]);
+  let admin;
+  try {
+    admin = await requireAdmin();
+  } catch (error) {
+    reportDashboardFailure("authentication", error);
+  }
+  let portals;
+  let recent;
+  try {
+    [portals, recent] = await Promise.all([listPortals(admin.agencyId), getRecentDownloads(admin.agencyId)]);
+  } catch (error) {
+    reportDashboardFailure("portal queries", error);
+  }
   const published = portals.filter((p) => p.isPublished).length;
   const downloads = portals.reduce((sum, p) => sum + p.downloads30d, 0);
 

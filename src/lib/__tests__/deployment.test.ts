@@ -49,7 +49,7 @@ import { createSession } from "../auth/session";
 import { portalCookieName } from "../auth/portal";
 import { sha256, verifyPassword, verifySetupSecret } from "../auth/password";
 import { recordFailedAttempt } from "../auth/rate-limit";
-import { runBatch } from "../data/portals";
+import { getRecentDownloads, listPortals, runBatch } from "../data/portals";
 import { cleanupExpiredUploads } from "../uploads";
 import { POST as upload } from "@/app/api/admin/upload/route";
 import { GET as fileGet } from "@/app/api/files/[fileId]/route";
@@ -131,6 +131,13 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)("Postgres deployment flows (isol
     expect(await db.query.pages.findFirst({ where: eq(pages.id, id) })).toBeUndefined();
     const rls = await db.execute(sql`select relrowsecurity from pg_class where oid = 'public.files'::regclass`);
     expect(rls[0].relrowsecurity).toBe(true);
+  });
+
+  it("loads the dashboard portal and activity queries for the signed-in agency", async () => {
+    const listed = await listPortals(agencyId);
+    expect(listed).toHaveLength(1);
+    expect(listed[0]).toMatchObject({ id: portalId, pageCount: 1, assetCount: 0, colorCount: 0, downloads30d: 0 });
+    expect(await getRecentDownloads(agencyId)).toEqual([]);
   });
 
   it("rejects cross-origin, oversized, unsupported and foreign-target uploads", async () => {
