@@ -1,4 +1,4 @@
-import { Download, Eye, LogOut, PenLine } from "lucide-react";
+import { Eye, LogOut, PenLine } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -17,7 +17,8 @@ export async function generateMetadata({ params }: PageProps<"/p/[slug]/[page]">
   const portal = await getPortalBySlug(slug);
   if (!portal) return { title: "Brand portal" };
   const viewer = await getPortalViewer(portal);
-  const page = viewer ? (await getGuide(portal.id)).find((p) => p.slug === pageSlug) : undefined;
+  const guide = viewer ? await getGuide(portal.id) : [];
+  const page = (viewer?.kind === "admin" ? guide : clientPages(guide)).find((p) => p.slug === pageSlug);
   return { title: page ? `${page.title} · ${portal.clientName}` : `${portal.clientName} brand portal` };
 }
 
@@ -60,14 +61,8 @@ export default async function GuidelinePage({ params }: PageProps<"/p/[slug]/[pa
   const position = pages.indexOf(page);
   const next = position === -1 ? pages[0] : pages[(position + 1) % pages.length];
   const blocks = page.blocks.filter(blockHasContent);
-  const hasFiles = blocks.some((b) => b.assets.length > 0 || b.colors.length > 0 || b.fonts.length > 0);
-  const buttonHref = page.buttonFileId
-    ? fileUrl(page.buttonFileId, { download: true })
-    : portal.allowZip && hasFiles
-      ? `/api/portals/${portal.id}/zip?page=${page.id}`
-      : null;
+  const buttonHref = page.buttonFileId ? fileUrl(page.buttonFileId, { download: true }) : null;
   const note = position !== -1 ? null : page.isHidden ? "This page is hidden from clients" : "Clients won't see this page until it has content";
-  const canZip = portal.allowZip && pages.length > 0;
 
   return (
     <GuideShell
@@ -77,14 +72,8 @@ export default async function GuidelinePage({ params }: PageProps<"/p/[slug]/[pa
       homeHref={`/p/${portal.slug}`}
       top={viewer.kind === "admin" ? <PreviewBar portal={portal} page={page} note={note} /> : undefined}
       sidebarFooter={
-        canZip || viewer.kind === "client" ? (
+        viewer.kind === "client" ? (
           <div className="flex flex-col items-start gap-2 text-[13px] leading-[17.5px]">
-            {canZip && (
-              <a href={`/api/portals/${portal.id}/zip`} download className="inline-flex items-center gap-1.5 transition-opacity hover:opacity-55">
-                <Download className="size-3.5" />
-                Download all files
-              </a>
-            )}
             {viewer.kind === "client" && (
               <form action={portalLogoutAction}>
                 <input type="hidden" name="slug" value={portal.slug} />

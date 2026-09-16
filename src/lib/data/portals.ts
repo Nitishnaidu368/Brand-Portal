@@ -1,6 +1,6 @@
 import "server-only";
 import { and, asc, count, countDistinct, desc, eq, gte, inArray, max } from "drizzle-orm";
-import type { BatchItem } from "drizzle-orm/batch";
+import type { SQLWrapper } from "drizzle-orm";
 import { cache } from "react";
 import { parseBlockData } from "@/lib/blocks";
 import { db } from "@/lib/db";
@@ -173,9 +173,11 @@ export async function nextPosition(table: Positioned, blockId: string) {
   return (row?.value ?? -1) + 1;
 }
 
-export async function runBatch(queries: BatchItem<"sqlite">[]) {
+export async function runBatch(queries: SQLWrapper[]) {
   if (queries.length === 0) return;
-  await db.batch(queries as [BatchItem<"sqlite">, ...BatchItem<"sqlite">[]]);
+  await db.transaction(async (tx) => {
+    for (const query of queries) await tx.execute(query.getSQL());
+  });
 }
 
 export async function touchPortal(portalId: string) {

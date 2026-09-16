@@ -1,5 +1,5 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { loginAttempts } from "@/lib/db/schema";
@@ -20,15 +20,14 @@ export async function isRateLimited(key: string) {
 
 export async function recordFailedAttempt(key: string) {
   const now = new Date();
-  const row = await db.query.loginAttempts.findFirst({ where: eq(loginAttempts.key, key) });
-  if (!row || now.getTime() - row.windowStart.getTime() > WINDOW_MS) {
-    await db
-      .insert(loginAttempts)
-      .values({ key, count: 1, windowStart: now })
-      .onConflictDoUpdate({ target: loginAttempts.key, set: { count: 1, windowStart: now } });
-  } else {
-    await db.update(loginAttempts).set({ count: row.count + 1 }).where(eq(loginAttempts.key, key));
-  }
+  const cutoff = new Date(now.getTime() - WINDOW_MS).toISOString();
+  await db.insert(loginAttempts).values({ key, count: 1, windowStart: now }).onConflictDoUpdate({
+    target: loginAttempts.key,
+    set: {
+      count: sql`case when ${loginAttempts.windowStart} < ${cutoff}::timestamptz then 1 else ${loginAttempts.count} + 1 end`,
+      windowStart: sql`case when ${loginAttempts.windowStart} < ${cutoff}::timestamptz then ${now.toISOString()}::timestamptz else ${loginAttempts.windowStart} end`,
+    },
+  });
 }
 
 export async function clearFailedAttempts(key: string) {

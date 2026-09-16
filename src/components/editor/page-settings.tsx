@@ -58,7 +58,7 @@ export function PageSettings({ portal, page, buttonFile }: { portal: Portal; pag
       <Card>
         <CardHeader
           title="What the button downloads"
-          description="Upload a file, or leave it empty to give clients a ZIP of this page's images, colors and fonts."
+          description="Upload a file or a prepared brand-kit ZIP (up to 50 MB). Without a file, the download button stays hidden."
         />
         <CardBody className="space-y-3">
           {buttonFile && (

@@ -2,13 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  serverExternalPackages: ["sharp", "jsdom", "dompurify", "archiver"],
-  experimental: {
-    serverActions: {
-      // Font files are added through a server action; everything else uses the upload route.
-      bodySizeLimit: "5mb",
-    },
-  },
+  serverExternalPackages: ["sharp", "jsdom", "dompurify"],
   async headers() {
     return [
       {

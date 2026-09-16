@@ -8,18 +8,22 @@
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
-    "seed": "tsx scripts/seed.ts",
+    "seed": "node --env-file-if-exists=.env.local --import tsx scripts/seed.ts",
     "test": "vitest run",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "db:migrate": "node --env-file-if-exists=.env.local --import tsx scripts/migrate.ts",
+    "storage:setup": "node --env-file-if-exists=.env.local --import tsx scripts/storage-setup.ts",
+    "uploads:cleanup": "node --env-file-if-exists=.env.local --import tsx scripts/cleanup-uploads.ts"
   },
   "dependencies": {
-    "archiver": "^8.0.0",
+    "@supabase/supabase-js": "^2.116.0",
     "clsx": "^2.1.1",
     "dompurify": "^3.4.15",
     "drizzle-orm": "^0.45.2",
     "jsdom": "^30.0.1",
     "lucide-react": "^1.46.0",
     "next": "16.3.5",
+    "postgres": "^3.4.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-markdown": "^10.1.0",
@@ -30,7 +34,6 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/archiver": "^8.0.0",
     "@types/jsdom": "^30.0.0",
     "@types/node": "^26.6.0",
     "@types/react": "^19",
@@ -42,5 +45,8 @@
     "tsx": "^4.23.13",
     "typescript": "^5",
     "vitest": "^5.0.1"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }

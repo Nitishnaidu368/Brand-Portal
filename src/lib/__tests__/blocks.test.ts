@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { contrastRating, defaultBlockData, parseBlockData, serializeBlockData, withTextField } from "../blocks";
-import { blockHasContent, clientPages, pageNumber, type GuideBlock, type GuidePage } from "../guide";
+import { blockHasContent, clientCanReadFile, clientPages, pageNumber, type GuideBlock, type GuidePage } from "../guide";
 import { guideTemplate, starterBlockData } from "../templates";
 import { BLOCK_TYPES } from "../db/schema";
 
@@ -97,6 +97,16 @@ describe("client visibility", () => {
     const hidden = page({ id: "b", intro: "Secret.", isHidden: true });
     const empty = page({ id: "c" });
     expect(clientPages([filled, hidden, empty]).map((p) => p.id)).toEqual(["a"]);
+  });
+
+  it("serves prepared downloads only while their page is visible", () => {
+    const portal = { logoFileId: "logo", coverFileId: null, wordmarkFileId: null };
+    const download = page({ buttonFileId: "zip" });
+    expect(clientPages([download])).toHaveLength(1);
+    expect(clientCanReadFile(portal, [download], "zip")).toBe(true);
+    expect(clientCanReadFile(portal, [{ ...download, isHidden: true }], "zip")).toBe(false);
+    expect(clientCanReadFile(portal, [], "unattached")).toBe(false);
+    expect(clientCanReadFile(portal, [], "logo")).toBe(true);
   });
 
   it("numbers pages from 01", () => {

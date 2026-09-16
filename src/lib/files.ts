@@ -8,10 +8,11 @@ import {
   isRasterMime,
   isSvgMime,
   mimeForUpload,
+  uploadHeaderMatches,
   type ExportOption,
 } from "./formats";
 import { probeDimensions, renderImage } from "./images";
-import { deleteObject, deletePrefix, getObject, getObjectIfExists, putObject } from "./storage";
+import { deleteObject, deletePrefix, getObject, objectExists, putObject } from "./storage";
 import { sanitizeSvg } from "./svg";
 import { newId, slugify } from "./utils";
 
@@ -37,9 +38,11 @@ export async function storeFile(input: {
   const name = input.name.replace(/[/\\]/g, "_").trim().slice(0, 200) || "file";
   const mime = mimeForUpload(name);
   if (!mime) throw new UploadError(`${name}: this file type isn't supported.`);
-  if (input.data.byteLength > MAX_UPLOAD_BYTES) {
+  if (input.data.byteLength === 0 || input.data.byteLength > MAX_UPLOAD_BYTES) {
     throw new UploadError(`${name}: files must be under ${Math.round(MAX_UPLOAD_BYTES / 1024 / 1024)} MB.`);
   }
+
+  if (!uploadHeaderMatches(name, input.data)) throw new UploadError(`${name}: the contents do not match the file extension.`);
 
   let data = input.data;
   if (isSvgMime(mime)) {
@@ -53,23 +56,28 @@ export async function storeFile(input: {
 
   const id = newId();
   const storageKey = `${ownerPrefix(input)}/${id}.${extensionOf(name)}`;
-  await putObject(storageKey, data);
+  await putObject(storageKey, data, mime);
 
-  const [record] = await db
-    .insert(files)
-    .values({
-      id,
-      agencyId: input.agencyId,
-      portalId: input.portalId,
-      storageKey,
-      originalName: name,
-      mimeType: mime,
-      sizeBytes: data.byteLength,
-      width: dimensions?.width ?? null,
-      height: dimensions?.height ?? null,
-    })
-    .returning();
-  return record;
+  try {
+    const [record] = await db
+      .insert(files)
+      .values({
+        id,
+        agencyId: input.agencyId,
+        portalId: input.portalId,
+        storageKey,
+        originalName: name,
+        mimeType: mime,
+        sizeBytes: data.byteLength,
+        width: dimensions?.width ?? null,
+        height: dimensions?.height ?? null,
+      })
+      .returning();
+    return record;
+  } catch (error) {
+    await deleteObject(storageKey).catch((cleanupError) => console.error("Upload cleanup failed", cleanupError));
+    throw error;
+  }
 }
 
 export async function deleteFile(file: FileRecord) {
@@ -84,30 +92,28 @@ export async function deleteFileById(fileId: string | null | undefined) {
   if (file) await deleteFile(file);
 }
 
-/** Original bytes, or a converted rendition (rendered once, then served from cache). */
-export async function readFileVariant(file: FileRecord, option: ExportOption) {
+/** Return an object key; file bytes are delivered by storage rather than the app function. */
+export async function fileVariantKey(file: FileRecord, option: ExportOption) {
   if (option.format === "original") {
-    return { data: await getObject(file.storageKey), mime: file.mimeType };
+    return file.storageKey;
   }
   const key = `${variantPrefix(file)}/${option.key}.${option.ext}`;
   const mime = FORMAT_MIME[option.format];
-  const cached = await getObjectIfExists(key);
-  if (cached) return { data: cached, mime };
+  if (await objectExists(key)) return key;
   const data = await renderImage(await getObject(file.storageKey), file.mimeType, option.format, option.scale);
-  await putObject(key, data);
-  return { data, mime };
+  await putObject(key, data, mime);
+  return key;
 }
 
 /** Lightweight rendition for on-screen thumbnails of large raster images. */
-export async function readPreview(file: FileRecord) {
+export async function previewKey(file: FileRecord) {
   const large = isRasterMime(file.mimeType) && file.mimeType !== "image/gif" && (file.width ?? 0) > PREVIEW_MAX_WIDTH;
-  if (!large) return { data: await getObject(file.storageKey), mime: file.mimeType };
+  if (!large) return file.storageKey;
   const key = `${variantPrefix(file)}/preview.webp`;
-  const cached = await getObjectIfExists(key);
-  if (cached) return { data: cached, mime: "image/webp" };
+  if (await objectExists(key)) return key;
   const data = await renderImage(await getObject(file.storageKey), file.mimeType, "webp", 1, PREVIEW_MAX_WIDTH);
-  await putObject(key, data);
-  return { data, mime: "image/webp" };
+  await putObject(key, data, "image/webp");
+  return key;
 }
 
 export function downloadFilename(baseName: string, option: ExportOption) {

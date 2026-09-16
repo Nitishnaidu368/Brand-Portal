@@ -10,7 +10,7 @@ import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import { hashPassword } from "../src/lib/auth/password";
 import { serializeBlockData } from "../src/lib/blocks";
-import { db } from "../src/lib/db";
+import { db, sqlClient } from "../src/lib/db";
 import {
   admins,
   agencies,
@@ -194,6 +194,9 @@ type SeedBlock = { type: BlockType; data?: Record<string, unknown>; fill?: (item
 type SeedPage = { intro: string; buttonLabel?: string; blocks: SeedBlock[] };
 
 async function main() {
+  if (process.env.NODE_ENV === "production" || process.env.ALLOW_DEMO_SEED !== "1") {
+    throw new Error("Demo seed is disabled. Use a development database and set ALLOW_DEMO_SEED=1 explicitly.");
+  }
   const force = process.argv.includes("--force");
 
   let [admin] = await db.select().from(admins).limit(1);
@@ -237,7 +240,6 @@ async function main() {
     accessMode: "password",
     passwordHash: await hashPassword(PORTAL_PASSWORD),
     isPublished: true,
-    allowZip: true,
   });
 
   const upload = (name: string, data: string | Uint8Array) =>
@@ -576,5 +578,5 @@ async function main() {
 
 main().catch((error) => {
   console.error(error);
-  process.exit(1);
-});
+  process.exitCode = 1;
+}).finally(() => sqlClient.end());

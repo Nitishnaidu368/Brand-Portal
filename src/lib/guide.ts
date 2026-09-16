@@ -46,7 +46,7 @@ export function blockHasContent(block: GuideBlock) {
 }
 
 export function pageHasContent(page: GuidePage) {
-  return Boolean(page.intro.trim()) || page.blocks.some(blockHasContent);
+  return Boolean(page.intro.trim() || page.buttonFileId) || page.blocks.some(blockHasContent);
 }
 
 /** Pages clients can open, in nav order: not hidden, and with something on them. */
@@ -57,4 +57,16 @@ export function clientPages(pages: GuidePage[]) {
 /** "01", "02", … */
 export function pageNumber(index: number) {
   return String(index + 1).padStart(2, "0");
+}
+
+/** Branding is visible on the portal; other files must be attached to a client-visible page. */
+export function clientCanReadFile(
+  portal: { logoFileId: string | null; coverFileId: string | null; wordmarkFileId: string | null },
+  guide: GuidePage[],
+  fileId: string,
+) {
+  if ([portal.logoFileId, portal.coverFileId, portal.wordmarkFileId].includes(fileId)) return true;
+  return clientPages(guide).some((page) => page.buttonFileId === fileId || page.blocks.some((block) =>
+    blockHasContent(block) && (block.assets.some((asset) => asset.fileId === fileId) || block.fonts.some((font) => font.fileId === fileId)),
+  ));
 }

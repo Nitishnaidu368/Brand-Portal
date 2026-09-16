@@ -1,40 +1,59 @@
-/**
- * Local-disk object storage. Every read and write goes through these functions, so moving to
- * Supabase Storage or Cloudflare R2 means reimplementing this file only.
- */
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { STORAGE_DIR } from "./config";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-function resolveKey(key: string) {
-  const full = path.resolve(STORAGE_DIR, key);
-  if (!full.startsWith(STORAGE_DIR + path.sep)) throw new Error(`Invalid storage key: ${key}`);
-  return full;
+let client: SupabaseClient | undefined;
+export const STORAGE_BUCKET = process.env.SUPABASE_STORAGE_BUCKET || "brand-portal";
+
+export function supabase() {
+  if (!client) {
+    const url = process.env.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) throw new Error("Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on the server.");
+    client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  }
+  return client;
 }
 
-export async function putObject(key: string, data: Uint8Array) {
-  const full = resolveKey(key);
-  await mkdir(path.dirname(full), { recursive: true });
-  await writeFile(full, data);
+export const storageBucket = () => supabase().storage.from(STORAGE_BUCKET);
+
+export async function putObject(key: string, data: Uint8Array, contentType = "application/octet-stream") {
+  const { error } = await storageBucket().upload(key, data, { contentType, upsert: true, cacheControl: "60" });
+  if (error) throw error;
 }
 
 export async function getObject(key: string) {
-  return readFile(resolveKey(key));
+  const { data, error } = await storageBucket().download(key);
+  if (error) throw error;
+  return Buffer.from(await data.arrayBuffer());
 }
 
-export async function getObjectIfExists(key: string) {
-  try {
-    return await readFile(resolveKey(key));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
-    throw error;
-  }
+export async function objectExists(key: string) {
+  const { data, error } = await storageBucket().exists(key);
+  if (error) throw error;
+  return data;
+}
+
+export async function signedObjectUrl(key: string, filename?: string) {
+  // ponytail: links remain usable for 60 seconds after revocation; proxy bytes if immediate revocation is needed.
+  const { data, error } = await storageBucket().createSignedUrl(key, 60, filename ? { download: filename } : undefined);
+  if (error) throw error;
+  return data.signedUrl;
 }
 
 export async function deleteObject(key: string) {
-  await rm(resolveKey(key), { force: true });
+  const { error } = await storageBucket().remove([key]);
+  if (error) throw error;
 }
 
 export async function deletePrefix(prefix: string) {
-  await rm(resolveKey(prefix), { recursive: true, force: true });
+  // Delete a page at a time, including nested variant folders; never use offsets while deleting.
+  for (;;) {
+    const { data, error } = await storageBucket().list(prefix, { limit: 100 });
+    if (error) throw error;
+    if (!data.length) return;
+    for (const item of data) {
+      const key = `${prefix}/${item.name}`;
+      if (item.id) await deleteObject(key);
+      else await deletePrefix(key);
+    }
+  }
 }

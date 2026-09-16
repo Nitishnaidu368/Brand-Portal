@@ -18,6 +18,9 @@ export default async function SetupPage() {
   return (
     <AuthShell title="Set up your studio" subtitle="Create the admin account you'll use to build client portals.">
       <ActionForm action={setupAction} className="space-y-4">
+        <Field label="Setup secret" htmlFor="setupSecret" name="setupSecret" hint="The private setup secret configured by the site owner.">
+          <PasswordInput id="setupSecret" name="setupSecret" required autoComplete="off" />
+        </Field>
         <Field label="Studio or agency name" htmlFor="agencyName" name="agencyName">
           <Input id="agencyName" name="agencyName" placeholder="Northstar Studio" required autoFocus />
         </Field>

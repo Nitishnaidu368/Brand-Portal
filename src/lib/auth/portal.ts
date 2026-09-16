@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { PORTAL_SESSION_DAYS, SECURE_COOKIES } from "@/lib/config";
 import { db } from "@/lib/db";
-import { portals, portalUsers, sessions, type Portal } from "@/lib/db/schema";
+import { portals, portalUsers, type Portal } from "@/lib/db/schema";
 import { getCurrentAdmin } from "./admin";
 import { createSession, deleteSession, findSession } from "./session";
 
@@ -62,9 +62,4 @@ export async function endPortalSession(portalId: string) {
   const name = portalCookieName(portalId);
   await deleteSession(store.get(name)?.value);
   store.delete(name);
-}
-
-/** Sign every client out of a portal, e.g. after the shared password changes. */
-export async function revokePortalSessions(portalId: string) {
-  await db.delete(sessions).where(and(eq(sessions.kind, "portal"), eq(sessions.portalId, portalId)));
 }

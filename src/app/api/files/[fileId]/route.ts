@@ -2,11 +2,13 @@ import { eq } from "drizzle-orm";
 import type { NextRequest } from "next/server";
 import { getCurrentAdmin } from "@/lib/auth/admin";
 import { getPortalById, getPortalViewer } from "@/lib/auth/portal";
-import { logDownload } from "@/lib/data/portals";
+import { getGuide, logDownload } from "@/lib/data/portals";
 import { db } from "@/lib/db";
 import { assets, files, fonts } from "@/lib/db/schema";
-import { downloadFilename, readFileVariant, readPreview } from "@/lib/files";
-import { exportOptionsFor, isSvgMime } from "@/lib/formats";
+import { downloadFilename, fileVariantKey, previewKey } from "@/lib/files";
+import { exportOptionsFor } from "@/lib/formats";
+import { clientCanReadFile } from "@/lib/guide";
+import { signedObjectUrl } from "@/lib/storage";
 
 const notFound = () => new Response("Not found", { status: 404 });
 
@@ -25,6 +27,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/files/[f
     const portal = await getPortalById(file.portalId);
     if (!portal) return notFound();
     viewer = await getPortalViewer(portal);
+    if (viewer?.kind === "client" && !clientCanReadFile(portal, await getGuide(portal.id), file.id)) return notFound();
     // The client's logo and cover image also appear on the portal's sign-in screen.
     if (!viewer && portal.isPublished && (file.id === portal.logoFileId || file.id === portal.coverFileId)) {
       viewer = { kind: "public", label: "" };
@@ -38,19 +41,19 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/files/[f
   const params = request.nextUrl.searchParams;
   const download = params.get("download") === "1";
   const headers = new Headers({
-    "Cache-Control": "private, max-age=300",
+    "Cache-Control": "private, no-store",
     "X-Content-Type-Options": "nosniff",
     "Content-Disposition": "inline",
   });
 
-  let body: Uint8Array;
-  let mime: string;
+  let key: string;
+  let filename: string | undefined;
   if (params.get("preview") === "1" && !download) {
-    ({ data: body, mime } = await readPreview(file));
+    key = await previewKey(file);
   } else {
     const option = exportOptionsFor(file.mimeType, file.originalName).find((o) => o.key === (params.get("v") ?? "original"));
     if (!option) return new Response("Unsupported format", { status: 400 });
-    ({ data: body, mime } = await readFileVariant(file, option));
+    key = await fileVariantKey(file, option);
 
     if (download) {
       const [asset, font] = await Promise.all([
@@ -58,7 +61,7 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/files/[f
         db.query.fonts.findFirst({ where: eq(fonts.fileId, file.id) }),
       ]);
       const label = asset?.name ?? (font ? `${font.family} ${font.weights}` : file.originalName);
-      const filename = downloadFilename(label, option);
+      filename = downloadFilename(label, option);
       headers.set("Content-Disposition", `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
       if (viewer.kind === "client" && file.portalId) {
         await logDownload({
@@ -73,9 +76,6 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/files/[f
     }
   }
 
-  headers.set("Content-Type", mime);
-  if (isSvgMime(mime)) {
-    headers.set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox");
-  }
-  return new Response(new Uint8Array(body), { headers });
+  headers.set("Location", await signedObjectUrl(key, filename));
+  return new Response(null, { status: 302, headers });
 }

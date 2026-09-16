@@ -6,11 +6,10 @@ import { z } from "zod";
 import { fail, formFields, ok, zodFail, type ActionState } from "@/lib/action-state";
 import { getCurrentAdmin } from "@/lib/auth/admin";
 import { hashPassword, MIN_PASSWORD_LENGTH } from "@/lib/auth/password";
-import { revokePortalSessions } from "@/lib/auth/portal";
 import { serializeBlockData } from "@/lib/blocks";
 import { runBatch } from "@/lib/data/portals";
 import { db } from "@/lib/db";
-import { ACCESS_MODES, blocks, pages, portals } from "@/lib/db/schema";
+import { ACCESS_MODES, blocks, pages, portals, sessions } from "@/lib/db/schema";
 import { deleteFileById } from "@/lib/files";
 import { deletePrefix } from "@/lib/storage";
 import { guideTemplate, type TemplatePage } from "@/lib/templates";
@@ -117,7 +116,7 @@ export async function updatePortalSettingsAction(_prev: ActionState, formData: F
 
   await db
     .update(portals)
-    .set({ ...parsed.data, allowZip: fields.allowZip === "on", updatedAt: new Date() })
+    .set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(portals.id, auth.portal.id));
   refreshAll();
   return ok("Settings saved");
@@ -168,8 +167,12 @@ export async function updateAccessAction(_prev: ActionState, formData: FormData)
 
   const modeChanged = accessMode !== portal.accessMode;
   const passwordChanged = passwordHash !== portal.passwordHash;
-  await db.update(portals).set({ accessMode, passwordHash, updatedAt: new Date() }).where(eq(portals.id, portal.id));
-  if (modeChanged || passwordChanged) await revokePortalSessions(portal.id);
+  await db.transaction(async (tx) => {
+    await tx.update(portals).set({ accessMode, passwordHash, updatedAt: new Date() }).where(eq(portals.id, portal.id));
+    if (modeChanged || passwordChanged) {
+      await tx.delete(sessions).where(and(eq(sessions.kind, "portal"), eq(sessions.portalId, portal.id)));
+    }
+  });
 
   refreshAll();
   if (passwordChanged && !modeChanged) return ok("Password updated. Clients will need the new password to sign in.");

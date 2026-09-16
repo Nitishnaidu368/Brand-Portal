@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { AuthShell } from "@/components/brand";
 import { PasswordInput } from "@/components/form/password-input";
 import { ActionForm, FormMessage, SubmitButton } from "@/components/ui/action-form";
@@ -10,6 +11,7 @@ import { getCurrentAdmin, hasAnyAdmin } from "@/lib/auth/admin";
 export const metadata: Metadata = { title: "Sign in" };
 
 export default async function LoginPage() {
+  await connection();
   if (!(await hasAnyAdmin())) redirect("/setup");
   if (await getCurrentAdmin()) redirect("/dashboard");
 

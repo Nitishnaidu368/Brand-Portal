@@ -13,30 +13,34 @@ type UploadItem = {
   error?: string;
 };
 
-function uploadFile(file: File, fields: Record<string, string>, onProgress: (fraction: number) => void) {
-  return new Promise<void>((resolve, reject) => {
+async function uploadFile(file: File, fields: Record<string, string>, onProgress: (fraction: number) => void) {
+  const request = async (body: object) => {
+    const response = await fetch("/api/admin/upload", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || `Upload failed (${response.status})`);
+    return data;
+  };
+  const { uploadId, uploadUrl } = await request({ ...fields, action: "init", name: file.name, size: file.size });
+  await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/api/admin/upload");
+    xhr.open("PUT", uploadUrl);
+    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    xhr.timeout = 5 * 60 * 1000;
     xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) onProgress(event.loaded / event.total);
+      if (event.lengthComputable) onProgress(0.9 * event.loaded / event.total);
     };
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) return resolve();
-      let message = `Upload failed (${xhr.status})`;
-      try {
-        message = JSON.parse(xhr.responseText).error ?? message;
-      } catch {
-        // non-JSON error body
-      }
-      reject(new Error(message));
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new Error("File transfer failed. Check the storage limit and try again."));
     };
     xhr.onerror = () => reject(new Error("Network error. Check your connection and try again."));
-
-    const body = new FormData();
-    for (const [key, value] of Object.entries(fields)) body.set(key, value);
-    body.set("file", file);
-    xhr.send(body);
+    xhr.ontimeout = () => reject(new Error("Upload timed out. Please try again."));
+    xhr.send(file);
   });
+  await request({ action: "complete", uploadId });
+  onProgress(1);
 }
 
 export function UploadDropzone({

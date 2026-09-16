@@ -92,3 +92,27 @@ export function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
+
+/** Header checks reject mislabeled documents; image decoding and SVG sanitizing happen server-side. */
+export function uploadHeaderMatches(name: string, data: Uint8Array) {
+  const ext = extensionOf(name);
+  const header = new TextDecoder("latin1").decode(data.subarray(0, 32));
+  const starts = (...bytes: number[]) => bytes.every((byte, index) => data[index] === byte);
+  switch (ext) {
+    case "svg": return true; // The SVG sanitizer/parser validates the whole document.
+    case "png": return starts(137, 80, 78, 71, 13, 10, 26, 10);
+    case "jpg": return starts(255, 216, 255);
+    case "gif": return header.startsWith("GIF87a") || header.startsWith("GIF89a");
+    case "webp": return header.startsWith("RIFF") && header.slice(8, 12) === "WEBP";
+    case "pdf": return header.startsWith("%PDF-");
+    case "zip": return starts(80, 75, 3, 4) || starts(80, 75, 5, 6) || starts(80, 75, 7, 8);
+    case "ai": return header.startsWith("%PDF-") || header.startsWith("%!PS");
+    case "eps": return header.startsWith("%!PS") || starts(197, 208, 211, 198);
+    case "woff": return header.startsWith("wOFF");
+    case "woff2": return header.startsWith("wOF2");
+    case "ttf": return starts(0, 1, 0, 0) || header.startsWith("true") || header.startsWith("ttcf");
+    case "otf": return header.startsWith("OTTO") || header.startsWith("ttcf");
+    case "mp4": return header.slice(4, 8) === "ftyp";
+    default: return false;
+  }
+}

@@ -14,7 +14,7 @@ import {
   recordFailedAttempt,
 } from "@/lib/auth/rate-limit";
 import { db } from "@/lib/db";
-import { portalUsers } from "@/lib/db/schema";
+import { portalUsers, sessions } from "@/lib/db/schema";
 
 const UNAVAILABLE = fail("This portal isn't available right now.");
 
@@ -90,16 +90,20 @@ export async function acceptInviteAction(_prev: ActionState, formData: FormData)
   const parsed = acceptSchema.safeParse(fields);
   if (!parsed.success) return zodFail(parsed.error);
 
-  await db
-    .update(portalUsers)
-    .set({
-      name: parsed.data.name || user.name,
-      passwordHash: await hashPassword(parsed.data.password),
-      inviteTokenHash: null,
-      inviteExpiresAt: null,
-      lastLoginAt: new Date(),
-    })
-    .where(eq(portalUsers.id, user.id));
+  const passwordHash = await hashPassword(parsed.data.password);
+  const accepted = await db.transaction(async (tx) => {
+    const [updated] = await tx.update(portalUsers).set({
+      name: parsed.data.name || user.name, passwordHash,
+      inviteTokenHash: null, inviteExpiresAt: null, lastLoginAt: new Date(),
+    }).where(and(
+      eq(portalUsers.id, user.id), eq(portalUsers.inviteTokenHash, sha256(fields.token ?? "")),
+      gt(portalUsers.inviteExpiresAt, new Date()),
+    )).returning({ id: portalUsers.id });
+    if (!updated) return false;
+    await tx.delete(sessions).where(eq(sessions.portalUserId, user.id));
+    return true;
+  });
+  if (!accepted) return fail("This invite link has expired or already been used. Ask for a new one.");
   await startPortalSession(portal.id, user.id);
   redirect(`/p/${portal.slug}`);
 }

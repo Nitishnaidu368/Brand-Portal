@@ -90,15 +90,6 @@ export default async function PortalSettingsPage({ params }: PageProps<"/dashboa
                 <ColorInput id="accentColor" name="accentColor" defaultValue={portal.accentColor} />
               </Field>
             </div>
-            <label className="flex cursor-pointer items-start gap-3">
-              <input type="checkbox" name="allowZip" defaultChecked={portal.allowZip} className="mt-1 accent-zinc-900" />
-              <span>
-                <span className="block text-sm font-medium text-zinc-900">Allow ZIP downloads</span>
-                <span className="block text-sm text-zinc-500">
-                  Clients can download every file at once, and page buttons without their own file give a ZIP of that page.
-                </span>
-              </span>
-            </label>
           </CardBody>
         </Card>
 

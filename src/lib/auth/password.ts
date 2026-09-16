@@ -47,3 +47,10 @@ export function sha256(value: string) {
 }
 
 export const MIN_PASSWORD_LENGTH = 8;
+
+/** Fail closed when production setup hasn't been explicitly configured. */
+export function verifySetupSecret(value: unknown) {
+  const secret = process.env.SETUP_SECRET;
+  return Boolean(secret && secret.length >= 32 && typeof value === "string" && value.length <= 200 &&
+    timingSafeEqual(Buffer.from(sha256(value), "hex"), Buffer.from(sha256(secret), "hex")));
+}

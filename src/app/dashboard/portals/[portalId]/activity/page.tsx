@@ -27,7 +27,7 @@ export default async function PortalActivityPage({ params }: PageProps<"/dashboa
           <CardHeader title="Download log" description="Admin previews aren't counted." />
           {activity.recent.length === 0 ? (
             <EmptyState icon={<Download className="size-5" />} title="No downloads yet">
-              When clients download files, copy exports or grab the ZIP, it shows up here.
+              When clients download files or export colors, it shows up here.
             </EmptyState>
           ) : (
             <div className="overflow-x-auto">
