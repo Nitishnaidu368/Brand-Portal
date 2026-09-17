@@ -36,7 +36,7 @@ export const ASPECTS = ["auto", "16/9", "3/2", "4/3", "1/1", "3/4"] as const;
 
 const card = z.object({ title: str(160), body: str(4000) });
 const pairing = z.object({ background: hex("#011520"), foreground: hex("#FFFFFF") });
-const scaleRow = z.object({ text: str(300), label: str(80), size: int(10, 200, 48), weight: int(100, 900, 400) });
+const scaleRow = z.object({ text: str(300), label: str(80), fontId: str(80), size: int(10, 200, 48), weight: int(100, 900, 400) });
 
 export const BLOCK_SCHEMAS = {
   text: z.object({ ...header }),

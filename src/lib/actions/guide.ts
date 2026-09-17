@@ -336,6 +336,7 @@ const LIST_ITEM_SCHEMAS = {
   typescale: z.object({
     text: z.string().max(300, "Keep the sample under 300 characters").default(""),
     label: z.string().max(80).default(""),
+    fontId: z.string().max(80).default(""),
     size: z.coerce.number().int("Use a whole number").min(10, "Use a size from 10 to 200").max(200, "Use a size from 10 to 200"),
     weight: z.coerce.number().int().min(100, "Use a weight from 100 to 900").max(900, "Use a weight from 100 to 900"),
   }),
@@ -345,7 +346,7 @@ type ListBlockType = keyof typeof LIST_ITEM_SCHEMAS;
 const NEW_LIST_ITEM: Record<ListBlockType, Record<string, unknown>> = {
   cards: { title: "", body: "" },
   pairings: { background: "#FFFFFF", foreground: "#011520" },
-  typescale: { text: "Sample text", label: "Style", size: 32, weight: 400 },
+  typescale: { text: "Sample text", label: "Style", fontId: "", size: 32, weight: 400 },
 };
 const MAX_LIST_ITEMS: Record<ListBlockType, number> = { cards: 24, pairings: 48, typescale: 12 };
 
@@ -382,6 +383,12 @@ export async function updateListItemAction(_prev: ActionState, formData: FormDat
   if (!auth.items[index]) return fail("That item no longer exists. Refresh and try again.");
   const parsed = LIST_ITEM_SCHEMAS[auth.type].safeParse(fields);
   if (!parsed.success) return zodFail(parsed.error);
+  if (auth.type === "typescale" && "fontId" in parsed.data && parsed.data.fontId) {
+    const font = await db.query.fonts.findFirst({
+      where: and(eq(fonts.id, parsed.data.fontId), eq(fonts.portalId, auth.portal.id)),
+    });
+    if (!font) return fail("That font is no longer available. Refresh and try again.");
+  }
   const items = [...auth.items];
   items[index] = parsed.data;
   return saveListItems(auth, items, "Saved");

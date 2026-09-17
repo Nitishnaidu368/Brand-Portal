@@ -61,6 +61,7 @@ export default async function GuidelinePage({ params }: PageProps<"/p/[slug]/[pa
   const position = pages.indexOf(page);
   const next = position === -1 ? pages[0] : pages[(position + 1) % pages.length];
   const blocks = page.blocks.filter(blockHasContent);
+  const fontOptions = guide.flatMap((candidate) => candidate.blocks.filter((block) => block.type === "typeface").flatMap((block) => block.fonts));
   const buttonHref = page.buttonFileId ? fileUrl(page.buttonFileId, { download: true }) : null;
   const note = position !== -1 ? null : page.isHidden ? "This page is hidden from clients" : "Clients won't see this page until it has content";
 
@@ -95,7 +96,7 @@ export default async function GuidelinePage({ params }: PageProps<"/p/[slug]/[pa
       />
       <main>
         {blocks.map((block) => (
-          <GuideBlockView key={block.id} block={block} ctx={{ edit: false, portalId: portal.id }} />
+          <GuideBlockView key={block.id} block={block} ctx={{ edit: false, portalId: portal.id, fontOptions }} />
         ))}
       </main>
       {next && next.id !== page.id && <NextBand href={`/p/${portal.slug}/${next.slug}`} title={next.title} />}

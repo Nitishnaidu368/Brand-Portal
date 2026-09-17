@@ -18,6 +18,11 @@ describe("parseBlockData", () => {
     expect(data.band).toBe(false);
   });
 
+  it("keeps a per-row typeface selection while defaulting legacy rows", () => {
+    expect(parseBlockData("typescale", JSON.stringify({ items: [{ text: "Display", fontId: "font-1" }] })).items[0].fontId).toBe("font-1");
+    expect(parseBlockData("typescale", JSON.stringify({ items: [{ text: "Body" }] })).items[0].fontId).toBe("");
+  });
+
   it("survives corrupt JSON", () => {
     expect(parseBlockData("text", "{not json").body).toBe("");
     expect(parseBlockData("cards", "[1,2]").items).toEqual([]);

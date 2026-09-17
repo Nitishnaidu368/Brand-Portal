@@ -4,7 +4,7 @@ import { addListItemAction, moveListItemAction, removeListItemAction, updateList
 import { contrastRating } from "@/lib/blocks";
 import { contrastRatio } from "@/lib/color";
 import { weightName } from "@/lib/fonts";
-import type { GuideBlock } from "@/lib/guide";
+import type { GuideBlock, GuideFont } from "@/lib/guide";
 import { ColorInput } from "../form/color-input";
 import { ActionButton } from "../ui/action-button";
 import { ActionForm, FormMessage, SubmitButton } from "../ui/action-form";
@@ -75,7 +75,7 @@ function ItemForm({ block, index, count, children }: { block: ListBlock; index: 
   );
 }
 
-function ItemFields({ block, index }: { block: ListBlock; index: number }) {
+function ItemFields({ block, index, fontOptions }: { block: ListBlock; index: number; fontOptions: GuideFont[] }) {
   const id = (name: string) => `${block.id}-${index}-${name}`;
 
   if (block.type === "cards") {
@@ -119,6 +119,16 @@ function ItemFields({ block, index }: { block: ListBlock; index: number }) {
       <Field label="Style name" htmlFor={id("label")} name="label">
         <Input id={id("label")} name="label" defaultValue={item.label} placeholder="Display" />
       </Field>
+      <Field label="Font family" htmlFor={id("fontId")} name="fontId">
+        <Select id={id("fontId")} name="fontId" defaultValue={item.fontId}>
+          <option value="">Use block default</option>
+          {fontOptions.map((font) => (
+            <option key={font.id} value={font.id}>
+              {font.family} · {font.source === "upload" ? "Uploaded" : "Google Fonts"}
+            </option>
+          ))}
+        </Select>
+      </Field>
       <Field label="Size (px)" htmlFor={id("size")} name="size">
         <Input id={id("size")} name="size" type="number" min={10} max={200} defaultValue={item.size} />
       </Field>
@@ -136,7 +146,7 @@ function ItemFields({ block, index }: { block: ListBlock; index: number }) {
 }
 
 /** Editor for the lists kept in block data: text grid cards, color pairings and type scale rows. */
-export function ListItemsEditor({ block }: { block: ListBlock }) {
+export function ListItemsEditor({ block, fontOptions = [] }: { block: ListBlock; fontOptions?: GuideFont[] }) {
   const items: unknown[] = block.data.items;
   const copy = COPY[block.type];
 
@@ -158,7 +168,7 @@ export function ListItemsEditor({ block }: { block: ListBlock }) {
         <ul className="divide-y divide-zinc-100">
           {items.map((item, index) => (
             <ItemForm key={`${index}:${JSON.stringify(item)}`} block={block} index={index} count={items.length}>
-              <ItemFields block={block} index={index} />
+              <ItemFields block={block} index={index} fontOptions={fontOptions} />
             </ItemForm>
           ))}
         </ul>

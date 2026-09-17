@@ -47,6 +47,7 @@ export default async function EditorPage({ params, searchParams }: PageProps<"/e
   if (index === -1) notFound();
 
   const page = guide[index];
+  const fontOptions = guide.flatMap((candidate) => candidate.blocks.filter((block) => block.type === "typeface").flatMap((block) => block.fonts));
   const next = guide[(index + 1) % guide.length];
   const selected = typeof query.block === "string" ? page.blocks.find((b) => b.id === query.block) : undefined;
   const pagePanel = !selected && query.panel === "page";
@@ -87,7 +88,7 @@ export default async function EditorPage({ params, searchParams }: PageProps<"/e
           <Fragment key={block.id}>
             <GuideBlockView
               block={block}
-              ctx={{ edit: true, portalId: portal.id }}
+              ctx={{ edit: true, portalId: portal.id, fontOptions }}
               selected={block.id === selected?.id}
               toolbar={
                 <BlockToolbar block={block} first={i === 0} last={i === page.blocks.length - 1} selected={block.id === selected?.id} />
@@ -102,7 +103,7 @@ export default async function EditorPage({ params, searchParams }: PageProps<"/e
 
       {selected && (
         <Drawer title={BLOCK_META[selected.type].label} description={BLOCK_META[selected.type].description} closeHref={closeHref}>
-          <BlockSettings block={selected} />
+          <BlockSettings block={selected} fontOptions={fontOptions} />
         </Drawer>
       )}
       {pagePanel && (

@@ -1,6 +1,6 @@
 import { updateBlockSettingsAction } from "@/lib/actions/guide";
 import { ASPECTS, BLOCK_META, TILE_BACKGROUNDS } from "@/lib/blocks";
-import type { GuideBlock } from "@/lib/guide";
+import type { GuideBlock, GuideFont } from "@/lib/guide";
 import { AssetsEditor } from "../dashboard/editors/assets-editor";
 import { ColorsEditor } from "../dashboard/editors/colors-editor";
 import { FontsEditor } from "../dashboard/editors/fonts-editor";
@@ -173,7 +173,7 @@ function LayoutToggles({ block }: { block: GuideBlock }) {
   }
 }
 
-export function BlockSettings({ block }: { block: GuideBlock }) {
+export function BlockSettings({ block, fontOptions = [] }: { block: GuideBlock; fontOptions?: GuideFont[] }) {
   const items = BLOCK_META[block.type].items;
 
   return (
@@ -213,7 +213,9 @@ export function BlockSettings({ block }: { block: GuideBlock }) {
       {block.type === "colors" && <ColorsEditor block={block} />}
       {block.type === "typeface" && <FontsEditor block={block} />}
       {items === "assets" && <AssetsEditor block={block} />}
-      {(block.type === "cards" || block.type === "pairings" || block.type === "typescale") && <ListItemsEditor block={block} />}
+      {(block.type === "cards" || block.type === "pairings" || block.type === "typescale") && (
+        <ListItemsEditor block={block} fontOptions={fontOptions} />
+      )}
     </>
   );
 }

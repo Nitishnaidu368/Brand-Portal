@@ -6,7 +6,7 @@ import { contrastRatio } from "@/lib/color";
 import { COLOR_EXPORT_FORMATS } from "@/lib/exports";
 import { googleFontsHref, parseWeights, weightName } from "@/lib/fonts";
 import { extensionOf, fileUrl, formatBytes, isImageMime } from "@/lib/formats";
-import type { GuideAsset, GuideBlock } from "@/lib/guide";
+import type { GuideAsset, GuideBlock, GuideFont } from "@/lib/guide";
 import { cn } from "@/lib/utils";
 import { DownloadMenu } from "../download-menu";
 import { Dropdown, DropdownLink } from "../dropdown";
@@ -16,7 +16,7 @@ import { TypeTester, type TypeFamily } from "../portal/type-tester";
 import { ColorSwatches } from "./color-swatches";
 import { Txt, type EditTarget } from "./txt";
 
-type Ctx = { edit: boolean; portalId: string };
+type Ctx = { edit: boolean; portalId: string; fontOptions?: GuideFont[] };
 type Of<T extends GuideBlock["type"]> = Extract<GuideBlock, { type: T }>;
 
 /** Horizontal page padding: 35px at desktop, measured from the reference. */
@@ -343,13 +343,28 @@ function TypescaleBody({ block, ctx }: { block: Of<"typescale">; ctx: Ctx }) {
   if (items.length === 0) return <EmptyBlock block={block} ctx={ctx}>Add type styles in the block settings</EmptyBlock>;
   const dark = background === "dark";
   const weights = [...new Set(items.map((item) => item.weight))];
+  const fontById = new Map((ctx.fontOptions ?? []).map((font) => [font.id, font]));
+  const blockFont = font ? `"${font}", var(--font-sans)` : undefined;
+  const cssFamily = (fontId: string) => {
+    const selected = fontById.get(fontId);
+    return selected ? selected.source === "upload" ? uploadedFontFamily(selected.id) : `"${selected.family}", sans-serif` : blockFont;
+  };
+  const displayLabel = (item: (typeof items)[number]) => {
+    if (ctx.edit) return item.label;
+    const family = fontById.get(item.fontId)?.family ?? font ?? "Default sans-serif";
+    return item.label ? `${item.label} · ${family}` : family;
+  };
+  const selectedFamilies = [...new Set(items.map((item) => fontById.get(item.fontId)).filter(Boolean))];
 
   return (
     <div className={PAD}>
-      {font && <link rel="stylesheet" href={googleFontsHref(font, weights)} precedence="default" />}
+      <FontFaces fonts={ctx.fontOptions ?? []} />
+      {font && !selectedFamilies.some((selected) => selected?.source === "google" && selected.family === font) && (
+        <link rel="stylesheet" href={googleFontsHref(font, weights)} precedence="default" />
+      )}
       <div
         className={cn("px-5 py-4 sm:py-6", dark ? "bg-black text-white" : "bg-guide-tile text-black")}
-        style={font ? { fontFamily: `"${font}", var(--font-sans)` } : undefined}
+        style={blockFont ? { fontFamily: blockFont } : undefined}
       >
         {items.map((item, index) => (
           <div
@@ -366,12 +381,12 @@ function TypescaleBody({ block, ctx }: { block: Of<"typescale">; ctx: Ctx }) {
               placeholder="Sample text"
               multiline
               className="max-w-full min-w-0 leading-[1.05] tracking-[-0.02em]"
-              style={{ fontSize: `min(${item.size}px, ${(item.size / 10.7).toFixed(2)}vw)`, fontWeight: item.weight }}
+              style={{ fontFamily: cssFamily(item.fontId), fontSize: `min(${item.size}px, ${(item.size / 10.7).toFixed(2)}vw)`, fontWeight: item.weight }}
             />
             <Txt
               edit={target}
               field={`items.${index}.label`}
-              value={item.label}
+              value={displayLabel(item)}
               placeholder="Style name"
               className="shrink-0 font-sans text-[14px] leading-[18px]"
             />
