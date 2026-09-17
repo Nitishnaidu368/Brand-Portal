@@ -49,7 +49,13 @@ export async function GET(request: NextRequest, ctx: RouteContext<"/api/files/[f
   let key: string;
   let filename: string | undefined;
   if (params.get("preview") === "1" && !download) {
-    key = await previewKey(file);
+    try {
+      key = await previewKey(file);
+    } catch (error) {
+      // ponytail: previews are an optimization; serve the original when Sharp or variant storage is unavailable.
+      console.error("Preview generation failed; serving original", error);
+      key = file.storageKey;
+    }
   } else {
     const option = exportOptionsFor(file.mimeType, file.originalName).find((o) => o.key === (params.get("v") ?? "original"));
     if (!option) return new Response("Unsupported format", { status: 400 });

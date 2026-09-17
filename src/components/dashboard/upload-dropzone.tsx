@@ -26,7 +26,7 @@ async function uploadFile(file: File, fields: Record<string, string>, onProgress
   await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", uploadUrl);
-    xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
     xhr.timeout = 5 * 60 * 1000;
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress(0.9 * event.loaded / event.total);
