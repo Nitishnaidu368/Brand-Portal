@@ -13,6 +13,11 @@ import { UploadDropzone } from "../upload-dropzone";
 
 export function FontsEditor({ block }: { block: GuideBlock }) {
   const count = block.fonts.length;
+  const families = new Set(block.fonts.filter((font) => font.source === "google").map((font) => font.family.toLowerCase()));
+  const presets = [
+    { family: "Cinzel", weights: "400, 500, 600, 700", usage: "Display" },
+    { family: "Montserrat", weights: "400, 500, 600, 700", usage: "Body" },
+  ].filter((font) => !families.has(font.family.toLowerCase()));
 
   return (
     <>
@@ -38,6 +43,21 @@ export function FontsEditor({ block }: { block: GuideBlock }) {
               <FormMessage />
             </div>
           </ActionForm>
+          {presets.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs text-zinc-500">Quick add:</span>
+              {presets.map((font) => (
+                <ActionForm key={font.family} action={addGoogleFontAction}>
+                  <input type="hidden" name="blockId" value={block.id} />
+                  <input type="hidden" name="family" value={font.family} />
+                  <input type="hidden" name="weights" value={font.weights} />
+                  <input type="hidden" name="style" value="normal" />
+                  <input type="hidden" name="usage" value={font.usage} />
+                  <SubmitButton variant="secondary" size="sm">{font.family}</SubmitButton>
+                </ActionForm>
+              ))}
+            </div>
+          )}
         </CardBody>
       </Card>
 

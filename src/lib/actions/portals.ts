@@ -9,7 +9,7 @@ import { hashPassword, MIN_PASSWORD_LENGTH } from "@/lib/auth/password";
 import { serializeBlockData } from "@/lib/blocks";
 import { runBatch } from "@/lib/data/portals";
 import { db } from "@/lib/db";
-import { ACCESS_MODES, blocks, pages, portals, sessions } from "@/lib/db/schema";
+import { ACCESS_MODES, blocks, fonts, pages, portals, sessions } from "@/lib/db/schema";
 import { deleteFileById } from "@/lib/files";
 import { deletePrefix } from "@/lib/storage";
 import { guideTemplate, type TemplatePage } from "@/lib/templates";
@@ -80,16 +80,29 @@ export async function createPortalAction(_prev: ActionState, formData: FormData)
           buttonLabel: page.buttonLabel ?? "",
           position: pagePosition,
         }),
-        ...page.blocks.map((block, position) =>
-          db.insert(blocks).values({
-            id: newId(),
-            portalId,
-            pageId,
-            type: block.type,
-            data: serializeBlockData(block.type, block.data ?? {}),
-            position,
-          }),
-        ),
+        ...page.blocks.flatMap((block, position) => {
+          const blockId = newId();
+          return [
+            db.insert(blocks).values({
+              id: blockId,
+              portalId,
+              pageId,
+              type: block.type,
+              data: serializeBlockData(block.type, block.data ?? {}),
+              position,
+            }),
+            ...(block.fonts ?? []).map((font, fontPosition) => db.insert(fonts).values({
+              id: newId(),
+              portalId,
+              blockId,
+              source: "google" as const,
+              family: font.family,
+              weights: font.weights,
+              usage: font.usage,
+              position: fontPosition,
+            })),
+          ];
+        }),
       ];
     }),
   ]);

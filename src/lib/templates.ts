@@ -1,6 +1,7 @@
 import type { BlockType } from "./db/schema";
 
-type TemplateBlock = { type: BlockType; data?: Record<string, unknown> };
+type TemplateFont = { family: string; weights: string; usage: string };
+type TemplateBlock = { type: BlockType; data?: Record<string, unknown>; fonts?: TemplateFont[] };
 export type TemplatePage = { slug: string; title: string; buttonLabel?: string; blocks: TemplateBlock[] };
 
 const text = (data: Record<string, unknown>): TemplateBlock => ({ type: "text", data });
@@ -61,7 +62,14 @@ export function guideTemplate(): TemplatePage[] {
       title: "Typography",
       buttonLabel: "Download Fonts",
       blocks: [
-        { type: "typeface", data: { divider: false } },
+        {
+          type: "typeface",
+          data: { divider: false },
+          fonts: [
+            { family: "Cinzel", weights: "400, 500, 600, 700", usage: "Display" },
+            { family: "Montserrat", weights: "400, 500, 600, 700", usage: "Body" },
+          ],
+        },
         media({ label: "Typeface", columns: 1, background: "dark", downloadable: false }),
         { type: "typescale", data: { label: "Weights & styles", items: [] } },
         text({ label: "Typeface settings" }),
